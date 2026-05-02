@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SHA-256 PoW Solver</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --bg: #f3f4f6;
+            --card-bg: #ffffff;
+            --text: #1f2937;
+            --border: #e5e7eb;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .container {
+            background-color: var(--card-bg);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            width: 100%;
+            max-width: 500px;
+        }
+
+        h1 {
+            margin-top: 0;
+            font-size: 1.5rem;
+            text-align: center;
+            color: var(--text);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 1rem;
+            box-sizing: border-box;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input:focus {
+            border-color: var(--primary);
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: var(--primary-hover);
+        }
+
+        button.mining {
+            background-color: #dc2626; /* Red for stop button */
+        }
+
+        button.mining:hover {
+            background-color: #b91c1c;
+        }
+
+        .result-box {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            word-break: break-all;
+            min-height: 60px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .hash-output {
+            font-family: monospace;
+            color: var(--primary);
+            font-size: 0.9rem;
+            margin-top: 5px;
+        }
+
+        .status {
+            font-size: 0.85rem;
+            color: #6b7280;
+            text-align: center;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>SHA-256 Nonce Finder</h1>
+        
+        <div class="form-group">
+            <label for="baseString">Base String</label>
+            <input type="text" id="baseString" value="83kiognd" placeholder="Enter your string here...">
+        </div>
+
+        <div class="form-group">
+            <label for="zeros">Target Zeros (Difficulty)</label>
+            <input type="number" id="zeros" value="3" min="1" max="10">
+        </div>
+
+        <button id="actionBtn" onclick="toggleMining()">Start Mining</button>
+
+        <div class="result-box" id="resultBox">
+            <div id="resultText">Waiting to start...</div>
+        </div>
+        <div class="status" id="statusText"></div>
+    </div>
+
+    <script>
+        let isMining = false;
+        let nonce = 0;
+        let targetPrefix = "";
+        let baseStr = "";
+        let startTime = 0;
+
+        const actionBtn = document.getElementById('actionBtn');
+        const resultText = document.getElementById('resultText');
+        const statusText = document.getElementById('statusText');
+
+        function toggleMining() {
+            if (isMining) {
+                // Stop mining
+                isMining = false;
+                actionBtn.textContent = "Start Mining";
+                actionBtn.classList.remove('mining');
+                statusText.textContent = `Stopped at nonce ${nonce.toLocaleString()}`;
+            } else {
+                // Start mining
+                baseStr = document.getElementById('baseString').value;
+                const zeros = parseInt(document.getElementById('zeros').value, 10);
+                targetPrefix = "0".repeat(zeros);
+                
+                nonce = 0;
+                isMining = true;
+                startTime = performance.now();
+                
+                actionBtn.textContent = "Stop Mining";
+                actionBtn.classList.add('mining');
+                resultText.innerHTML = "Mining in progress...";
+                statusText.textContent = "Calculating...";
+
+                // Start the loop
+                mineChunk();
+            }
+        }
+
+        function mineChunk() {
+            if (!isMining) return;
+
+            // Process 5,000 hashes per chunk to prevent browser UI freezing
+            const chunkSize = 5000;
+            const limit = nonce + chunkSize;
+
+            for (; nonce < limit; nonce++) {
+                // Concatenate and hash
+                const inputData = baseStr + nonce;
+                const hash = CryptoJS.SHA256(inputData).toString(CryptoJS.enc.Hex);
+
+                // Check condition
+                if (hash.startsWith(targetPrefix)) {
+                    const timeTaken = ((performance.now() - startTime) / 1000).toFixed(2);
+                    
+                    // Update UI with success
+                    resultText.innerHTML = `
+                        <strong>Success!</strong><br>
+                        Nonce: <strong>${nonce}</strong><br>
+                        <div class="hash-output">${hash}</div>
+                    `;
+                    statusText.textContent = `Found in ${timeTaken} seconds (${nonce.toLocaleString()} attempts).`;
+                    
+                    // Reset button state
+                    isMining = false;
+                    actionBtn.textContent = "Start Mining";
+                    actionBtn.classList.remove('mining');
+                    return; // Exit loop
+                }
+            }
+
+            // Update UI progress and schedule the next chunk
+            statusText.textContent = `Checking nonce: ${nonce.toLocaleString()}...`;
+            
+            // Use setTimeout to yield execution back to the browser's main thread
+            setTimeout(mineChunk, 0);
+        }
+    </script>
+</body>
+</html>
